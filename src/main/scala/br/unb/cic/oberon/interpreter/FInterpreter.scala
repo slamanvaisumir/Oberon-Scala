@@ -22,7 +22,8 @@ import scala.language.{existentials, postfixOps}
  * We assume the program is well-typed, otherwise,
  * a runtime exception might be thrown.
  */
-class Interpreter extends OberonVisitorAdapter {
+
+class FInterpreter extends OberonVisitorAdapter {
 
 
   type T = Unit
@@ -140,9 +141,9 @@ class Interpreter extends OberonVisitorAdapter {
              values.foreach(value => {
                  env.setVariable(v, evalExpression(value))
                  stmt.accept(this)
-//               val assignment = AssignmentStmt(VarAssignment(v), value)
-//               val stmts = SequenceStmt(List(assignment, stmt))
-//               stmts.accept(this)
+                // val assignment = AssignmentStmt(VarAssignment(v), value)
+                // val stmts = SequenceStmt(List(assignment, stmt))
+                // stmts.accept(this)
              })
            }
 
@@ -218,15 +219,9 @@ class Interpreter extends OberonVisitorAdapter {
     env.pop()
   }
 
-  def evalCondition(expression: Expression): Boolean = {
-    val evalVisitor = new EvalExpressionVisitor(this)
-    expression.accept(evalVisitor).asInstanceOf[BoolValue].value
-  }
+  def evalCondition(expression: Expression): Boolean = fEval(expression).asInstanceOf[Value].value.asInstanceOf[Boolean]
 
-  def evalExpression(expression: Expression): Expression = {
-    val evalVisitor = new EvalExpressionVisitor(this)
-    expression.accept(evalVisitor)
-  }
+  def evalExpression(expression: Expression): Expression = fEval(expression)
 
   /*
    * This method is mostly useful for testing purposes.
@@ -247,117 +242,105 @@ class Interpreter extends OberonVisitorAdapter {
   def setTestEnvironment() = {
     printStream = new PrintStream(new NullPrintStream())
   }
-}
-
-class EvalExpressionVisitor(val interpreter: Interpreter) extends OberonVisitorAdapter {
-  type T = Expression
 
 
-  override def visit(exp: Expression): Expression = exp match {
-    case Brackets(expression) => expression.accept(this)
-    case IntValue(v) => IntValue(v)
-    case RealValue(v) => RealValue(v)
-    case CharValue(v) => CharValue(v)
-    case BoolValue(v) => BoolValue(v)
-    case StringValue(v) => StringValue(v)
-    case NullValue => NullValue
-    case Undef() => Undef()
-    case VarExpression(name) => interpreter.env.lookup(name).get
-    case ArraySubscript(a, i) => visitArraySubscriptExpression(ArraySubscript(a, i))
-    case AddExpression(left, right) => arithmeticExpression(left, right, (v1: Number, v2: Number) => v1+v2)
-    case SubExpression(left, right) => arithmeticExpression(left, right, (v1: Number, v2: Number) => v1-v2)
-    case MultExpression(left, right) => arithmeticExpression(left, right, (v1: Number, v2: Number) => v1*v2)
-    case DivExpression(left, right) => arithmeticExpression(left, right, (v1: Number, v2: Number) => v1/v2)
-    case ModExpression(left, right) => modularExpression(left, right, (v1: Modular, v2: Modular) => v1.mod(v2))
-    case EQExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1 == v2))
-    case NEQExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1 != v2))
-    case GTExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1 > v2))
-    case LTExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1 < v2))
-    case GTEExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1 >= v2))
-    case LTEExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1 <= v2))
-    case NotExpression(exp) => BoolValue(!exp.accept(this).asInstanceOf[Value].value.asInstanceOf[Boolean])
-    case AndExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1.value.asInstanceOf[Boolean] && v2.value.asInstanceOf[Boolean]))
-    case OrExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1.value.asInstanceOf[Boolean] || v2.value.asInstanceOf[Boolean]))
-    case FunctionCallExpression(name, args) => {
-      val exp = visitFunctionCall(name, args)
-      exp
+    def fEval(exp : Expression/*, environ : Environment*/) : Expression = exp match {
+      case Brackets(expression) => fEval(expression)
+      case IntValue(v) => IntValue(v)
+      case RealValue(v) => RealValue(v)
+      case CharValue(v) => CharValue(v)
+      case BoolValue(v) => BoolValue(v)
+      case StringValue(v) => StringValue(v)
+      case NullValue => NullValue
+      case Undef() => Undef()
+      case VarExpression(name) => env/*iron*/.lookup(name).get
+      case ArraySubscript(a, i) => evalArraySubscriptExpression(ArraySubscript(a, i))
+      case AddExpression(left, right) => arithmeticExpression(left, right, (v1: Number, v2: Number) => v1+v2)
+      case SubExpression(left, right) => arithmeticExpression(left, right, (v1: Number, v2: Number) => v1-v2)
+      case MultExpression(left, right) => arithmeticExpression(left, right, (v1: Number, v2: Number) => v1*v2)
+      case DivExpression(left, right) => arithmeticExpression(left, right, (v1: Number, v2: Number) => v1/v2)
+      case ModExpression(left, right) => modularExpression(left, right, (v1: Modular, v2: Modular) => v1.mod(v2))
+      case EQExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1 == v2))
+      case NEQExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1 != v2))
+      case GTExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1 > v2))
+      case LTExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1 < v2))
+      case GTEExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1 >= v2))
+      case LTEExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1 <= v2))
+      case NotExpression(exp) => BoolValue(!fEval(exp).asInstanceOf[Value].value.asInstanceOf[Boolean])
+      case AndExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1.value.asInstanceOf[Boolean] && v2.value.asInstanceOf[Boolean]))
+      case OrExpression(left, right) => binExpression(left, right, (v1: Value, v2: Value) => BoolValue(v1.value.asInstanceOf[Boolean] || v2.value.asInstanceOf[Boolean]))
+      case FunctionCallExpression(name, args) => {
+        val res = evalFunctionCall(name, args)
+        res
+      }
+
+        //TODO FieldAccessExpression
+        //TODO PointerAccessExpression
     }
 
-    //TODO FieldAccessExpression
-    //TODO PointerAccessExpression
-  }
-
-  def visitArraySubscriptExpression(arraySubscript: ArraySubscript): Expression = {
-    val array =  arraySubscript.arrayBase.accept(this)
-    val idx = arraySubscript.index.accept(this)
-
-    (array, idx) match {
-      case (ArrayValue(values: ListBuffer[Expression], _), IntValue(v)) => values(v)
-      case _ => throw new RuntimeException
+    def evalArraySubscriptExpression(arraySubscript: ArraySubscript): Expression = {
+        
+        (fEval(arraySubscript.arrayBase), fEval(arraySubscript.index)) match {
+          case (ArrayValue(values: ListBuffer[Expression], _), IntValue(v)) => values(v)
+          case _ => throw new RuntimeException
+        }
     }
-  }
-  def visitFunctionCall(name: String, args: List[Expression]): Expression = {
-    interpreter.callProcedure(name, args)
-    val returnValue = interpreter.env.lookup(Values.ReturnKeyWord)
-    interpreter.returnProcedure()
-    assert(returnValue.isDefined) // a function call must set a local variable with the "return" expression
-    returnValue.get
-  }
 
-  /**
-   * Eval an arithmetic expression on Numbers
-   *
-   * @param left  the left expression
-   * @param right the right expression
-   * @param op    a function representing the operator
-   * @return the application of the operator after
-   *         evaluating left and right to reduce them to
-   *         numbers.
-   */
-  def arithmeticExpression(left: Expression, right: Expression, fn: (Number, Number) => Number): Expression = {
-    val vl = left.accept(this).asInstanceOf[Number]
-    val vr = right.accept(this).asInstanceOf[Number]
+    def evalFunctionCall(name: String, args: List[Expression]): Expression = {
+        callProcedure(name, args)
+        val returnValue = env.lookup(Values.ReturnKeyWord)
+        returnProcedure()
+        assert(returnValue.isDefined) // a function call must set a local variable with the "return" expression
+        returnValue.get
+    }
 
-    fn(vl, vr)
-  }
+    /**
+     * Eval an arithmetic expression on Numbers
+     *
+     * @param left  the left expression
+     * @param right the right expression
+     * @param op    a function representing the operator
+     * @return the application of the operator after
+     *         evaluating left and right to reduce them to
+     *         numbers.
+     */
+    def arithmeticExpression(left: Expression, right: Expression, fn: (Number, Number) => Number): Expression = 
+        fn(fEval(left).asInstanceOf[Number], fEval(right).asInstanceOf[Number])
+    
 
-  /**
-   * Eval an modular expression on Numbers
-   *
-   * @param left  the left expression
-   * @param right the right expression
-   * @param op    a function representing the operator
-   * @return the application of the operator after
-   *         evaluating left and right to reduce them to
-   *         numbers.
-   */
-  def modularExpression(left: Expression, right: Expression, fn: (Modular, Modular) => Modular): Expression = {
-    val vl = left.accept(this).asInstanceOf[Modular]
-    val vr = right.accept(this).asInstanceOf[Modular]
+    /**
+     * Eval an modular expression on Numbers
+     *
+     * @param left  the left expression
+     * @param right the right expression
+     * @param op    a function representing the operator
+     * @return the application of the operator after
+     *         evaluating left and right to reduce them to
+     *         numbers.
+     */
+    def modularExpression(left: Expression, right: Expression, fn: (Modular, Modular) => Modular): Expression = 
+        fn(fEval(left).asInstanceOf[Modular], fEval(right).asInstanceOf[Modular])
+    
 
-    fn(vl, vr)
-  }
 
-  /**
-   * Eval a binary expression on values.
-   *
-   * @param left  the left expression
-   * @param right the right expression
-   * @param fn    a function that constructs an expression. Here we
-   *              are using a high-order function. We assign to
-   *              the "result" visitor attribute the value we compute
-   *              after applying this function.
-   */
-  def binExpression(left: Expression, right: Expression, fn: (Value, Value) => Expression): Expression = {
-    val v1 = left.accept(this).asInstanceOf[Value]
-    val v2 = right.accept(this).asInstanceOf[Value]
+    /**
+     * Eval a binary expression on values.
+     *
+     * @param left  the left expression
+     * @param right the right expression
+     * @param fn    a function that constructs an expression. Here we
+     *              are using a high-order function. We assign to
+     *              the "result" visitor attribute the value we compute
+     *              after applying this function.
+     */
+    def binExpression(left: Expression, right: Expression, fn: (Value, Value) => Expression): Expression = 
+        fn(fEval(left).asInstanceOf[Value], fEval(right).asInstanceOf[Value])
+    
 
-    fn(v1, v2)
-  }
 }
 
-class NullPrintStream extends PrintStream(new NullByteArrayOutputStream) {}
+// class NullPrintStream extends PrintStream(new NullByteArrayOutputStream) {}
 
-class NullByteArrayOutputStream extends ByteArrayOutputStream {
-  override def writeTo(o: OutputStream) = {}
-}
+// class NullByteArrayOutputStream extends ByteArrayOutputStream {
+//   override def writeTo(o: OutputStream) = {}
+// }
